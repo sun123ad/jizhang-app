@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthProvider";
 import { useTransactions } from "@/lib/useTransactions";
-import { BASE_CURRENCY } from "@/lib/types";
+import { getExchangeRate } from "@/lib/exchangeRate";
+import { BASE_CURRENCY, CURRENCIES, type Currency } from "@/lib/types";
 import { BackupReminderBanner } from "@/app/components/BackupReminderBanner";
+import { CategoryBreakdown } from "@/app/components/CategoryBreakdown";
 
 function monthRange() {
   const now = new Date();
@@ -16,10 +18,40 @@ function monthRange() {
   };
 }
 
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function HomePage() {
   const { ledgerId, loading: authLoading } = useAuth();
   const { from, to } = useMemo(() => monthRange(), []);
   const { transactions, loading } = useTransactions(ledgerId, { from, to });
+
+  const [displayCurrency, setDisplayCurrency] = useState<Currency>(BASE_CURRENCY);
+  const [rate, setRate] = useState(1);
+  const [rateError, setRateError] = useState(false);
+
+  useEffect(() => {
+    if (displayCurrency === BASE_CURRENCY) {
+      setRate(1);
+      setRateError(false);
+      return;
+    }
+    let cancelled = false;
+    getExchangeRate(displayCurrency, today())
+      .then((r) => {
+        if (!cancelled) {
+          setRate(r);
+          setRateError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRateError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [displayCurrency]);
 
   const { income, expense, categoryList } = useMemo(() => {
     let income = 0;
@@ -50,7 +82,8 @@ export default function HomePage() {
     );
   }
 
-  const maxCategory = categoryList[0]?.[1] ?? 0;
+  const convert = (amountInBase: number) =>
+    displayCurrency === BASE_CURRENCY ? amountInBase : amountInBase / rate;
 
   return (
     <div className="flex flex-col gap-4">
@@ -58,47 +91,55 @@ export default function HomePage() {
 
       <section className="rounded-xl border border-gray-200 bg-white p-5">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">本月结余（{BASE_CURRENCY}）</p>
+          <p className="text-sm text-gray-500">本月结余（{displayCurrency}）</p>
           {loading && <span className="text-xs text-gray-400">同步中...</span>}
         </div>
         <p className="mt-1 text-3xl font-semibold">
-          {(income - expense).toFixed(2)}
+          {convert(income - expense).toFixed(2)}
         </p>
         <div className="mt-4 flex gap-6 text-sm">
           <div>
             <p className="text-gray-500">收入</p>
-            <p className="font-medium text-green-600">{income.toFixed(2)}</p>
+            <p className="font-medium text-green-600">
+              {convert(income).toFixed(2)}
+            </p>
           </div>
           <div>
             <p className="text-gray-500">支出</p>
-            <p className="font-medium text-red-600">{expense.toFixed(2)}</p>
+            <p className="font-medium text-red-600">
+              {convert(expense).toFixed(2)}
+            </p>
           </div>
         </div>
+
+        <div className="mt-4 flex rounded-lg bg-gray-100 p-1 text-xs">
+          {CURRENCIES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setDisplayCurrency(c)}
+              className={`flex-1 rounded-md py-1.5 ${
+                displayCurrency === c ? "bg-white shadow font-medium" : "text-gray-500"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+        {rateError && (
+          <p className="mt-2 text-xs text-red-600">
+            汇率获取失败，以上金额可能不准确
+          </p>
+        )}
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-5">
-        <p className="mb-3 text-sm text-gray-500">支出分类占比</p>
-        {categoryList.length === 0 && (
-          <p className="text-sm text-gray-400">本月还没有支出记录</p>
-        )}
-        <div className="flex flex-col gap-2">
-          {categoryList.map(([cat, amt]) => (
-            <div key={cat}>
-              <div className="mb-1 flex justify-between text-sm">
-                <span>{cat}</span>
-                <span>{amt.toFixed(2)}</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100">
-                <div
-                  className="h-2 rounded-full bg-blue-500"
-                  style={{
-                    width: `${maxCategory ? (amt / maxCategory) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+        <CategoryBreakdown
+          categoryList={categoryList.map(
+            ([cat, amt]) => [cat, convert(amt)] as [string, number],
+          )}
+          currency={displayCurrency}
+        />
       </section>
 
       <Link

@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# personal data exports/imports — not source code
+/账本备份_*.md
+/备份/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

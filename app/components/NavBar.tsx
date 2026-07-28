@@ -8,7 +8,7 @@ const LINKS = [
   { href: "/", label: "首页" },
   { href: "/transactions/new", label: "记一笔" },
   { href: "/transactions", label: "明细" },
-  { href: "/export", label: "导出" },
+  { href: "/export", label: "备份" },
 ];
 
 export function NavBar() {

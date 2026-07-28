@@ -24,7 +24,7 @@ export async function getExchangeRate(
 
   try {
     const res = await fetch(
-      `https://api.frankfurter.app/${date}?from=${currency}&to=${BASE_CURRENCY}`,
+      `https://api.frankfurter.dev/v1/${date}?from=${currency}&to=${BASE_CURRENCY}`,
     );
     if (!res.ok) throw new Error("汇率请求失败");
     const json = await res.json();
