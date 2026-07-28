@@ -28,6 +28,12 @@ export const viewport = {
   themeColor: "#2563eb",
 };
 
+// Every page is behind login and reads per-user data client-side, so there's
+// nothing to statically prerender. Forcing dynamic rendering site-wide also
+// sidesteps Next 16's build-time static-generation edge cases (e.g. the
+// /_not-found prerender crash caused by client navigation hooks in the layout).
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
