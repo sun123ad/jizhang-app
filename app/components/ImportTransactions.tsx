@@ -2,11 +2,16 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/AuthProvider";
+import { useCategories } from "@/lib/useCategories";
 import { supabase } from "@/lib/supabase";
 import { getExchangeRate } from "@/lib/exchangeRate";
 import { parseMarkdownTable, type ParseResult } from "@/lib/importMarkdown";
 
-const PROMPT_TEMPLATE = `请把我下面描述的收支记录整理成一个 Markdown 表格，表头和格式严格如下（不要增删列，日期必须是 YYYY-MM-DD）：
+function buildPromptTemplate(
+  expenseCategories: string[],
+  incomeCategories: string[],
+) {
+  return `请把我下面描述的收支记录整理成一个 Markdown 表格，表头和格式严格如下（不要增删列，日期必须是 YYYY-MM-DD）：
 
 | 日期 | 类型 | 币种 | 金额 | 分类 | 备注 |
 |------|------|------|------|------|------|
@@ -14,15 +19,18 @@ const PROMPT_TEMPLATE = `请把我下面描述的收支记录整理成一个 Mar
 
 - 类型只能填"支出"或"收入"
 - 币种只能填 CNY、SGD 或 GBP
-- 支出分类只能是：餐饮、交通、房租、购物、娱乐、其他
-- 收入分类只能是：工资、其他
+- 支出分类只能是：${expenseCategories.join("、")}
+- 收入分类只能是：${incomeCategories.join("、")}
 - 备注可以留空，但列要保留
 
 我的记录：
 （把你的自然语言描述粘贴在这里）`;
+}
 
 export function ImportTransactions() {
   const { ledgerId, user } = useAuth();
+  const { categories: expenseCategories } = useCategories(ledgerId, "expense");
+  const { categories: incomeCategories } = useCategories(ledgerId, "income");
   const [showFormat, setShowFormat] = useState(false);
   const [copied, setCopied] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -31,8 +39,10 @@ export function ImportTransactions() {
   const [importError, setImportError] = useState<string | null>(null);
   const [imported, setImported] = useState<number | null>(null);
 
+  const promptTemplate = buildPromptTemplate(expenseCategories, incomeCategories);
+
   function handleCopyPrompt() {
-    navigator.clipboard.writeText(PROMPT_TEMPLATE).then(() => {
+    navigator.clipboard.writeText(promptTemplate).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -47,7 +57,12 @@ export function ImportTransactions() {
     setImportError(null);
     const reader = new FileReader();
     reader.onload = () => {
-      setParseResult(parseMarkdownTable(String(reader.result ?? "")));
+      setParseResult(
+        parseMarkdownTable(String(reader.result ?? ""), {
+          expense: expenseCategories,
+          income: incomeCategories,
+        }),
+      );
     };
     reader.readAsText(file);
   }
@@ -112,7 +127,7 @@ export function ImportTransactions() {
         {showFormat && (
           <div className="mt-3 flex flex-col gap-2">
             <pre className="whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-xs text-gray-700">
-              {PROMPT_TEMPLATE}
+              {promptTemplate}
             </pre>
             <button
               type="button"

@@ -83,20 +83,31 @@ function parseAmount(raw: string): { value?: number; error?: string } {
   return { value: Math.round(value * 100) / 100 };
 }
 
+export interface KnownCategories {
+  expense: readonly string[];
+  income: readonly string[];
+}
+
 function normalizeCategory(
   type: TransactionType,
   raw: string,
+  known?: KnownCategories,
 ): { value: string; warning?: string } {
   const value = raw.trim();
-  const list: readonly string[] = type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  const fixed: readonly string[] = type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  const extra = (type === "expense" ? known?.expense : known?.income) ?? [];
+  const list = [...fixed, ...extra];
   if (list.includes(value)) return { value };
   return {
     value: "其他",
-    warning: `分类"${raw}"不在预设列表（${list.join("/")}）里，已归为"其他"`,
+    warning: `分类"${raw}"不在已有分类列表里，已归为"其他"（可以先在"记一笔"里把它加成自定义分类，再重新导入）`,
   };
 }
 
-export function parseMarkdownTable(content: string): ParseResult {
+export function parseMarkdownTable(
+  content: string,
+  knownCategories?: KnownCategories,
+): ParseResult {
   const lines = content.split(/\r?\n/);
   const tableLineIndexes: number[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -160,7 +171,7 @@ export function parseMarkdownTable(content: string): ParseResult {
 
     let category: string | undefined;
     if (type.value) {
-      const normalized = normalizeCategory(type.value, raw.category);
+      const normalized = normalizeCategory(type.value, raw.category, knownCategories);
       category = normalized.value;
       if (normalized.warning) warnings.push(normalized.warning);
     }

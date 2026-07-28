@@ -11,6 +11,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   娱乐: "#e87ba4",
   其他: "#008300",
 };
+// Slots 7-8 of the categorical palette, for user-added custom categories.
+const EXTRA_COLORS = ["#4a3aa7", "#e34948"];
+const FALLBACK_COLOR = "#898781";
 
 type ViewMode = "list" | "donut";
 
@@ -34,11 +37,25 @@ export function CategoryBreakdown({
   const maxCategory = categoryList[0]?.[1] ?? 0;
   const total = categoryList.reduce((sum, [, amt]) => sum + amt, 0);
 
-  // Fixed category order (not amount rank) so a category always keeps the
-  // same color and ring position, month to month.
-  const ordered = EXPENSE_CATEGORIES.map(
-    (cat) => [cat, categoryList.find(([c]) => c === cat)?.[1] ?? 0] as [string, number],
-  ).filter(([, amt]) => amt > 0);
+  // Fixed categories first (stable color/position month to month), then any
+  // custom categories in alphabetical order so their colors stay stable too.
+  const customCats = categoryList
+    .map(([cat]) => cat)
+    .filter((cat) => !(EXPENSE_CATEGORIES as readonly string[]).includes(cat))
+    .sort((a, b) => a.localeCompare(b, "zh"));
+  const allCats = [...EXPENSE_CATEGORIES, ...customCats];
+  const colorMap = new Map<string, string>(
+    allCats.map((cat, i) => [
+      cat,
+      CATEGORY_COLORS[cat] ??
+        EXTRA_COLORS[i - EXPENSE_CATEGORIES.length] ??
+        FALLBACK_COLOR,
+    ]),
+  );
+
+  const ordered = allCats
+    .map((cat) => [cat, categoryList.find(([c]) => c === cat)?.[1] ?? 0] as [string, number])
+    .filter(([, amt]) => amt > 0);
 
   const drawable = CIRCUMFERENCE - ordered.length * SEGMENT_GAP;
   const lengths = ordered.map(([, amt]) => (total > 0 ? (amt / total) * drawable : 0));
@@ -51,7 +68,7 @@ export function CategoryBreakdown({
   const segments = ordered.map(([cat, amt], i) => ({
     cat,
     amt,
-    color: CATEGORY_COLORS[cat],
+    color: colorMap.get(cat)!,
     dashArray: `${lengths[i]} ${CIRCUMFERENCE - lengths[i]}`,
     dashOffset: -offsets[i],
   }));
@@ -168,7 +185,7 @@ export function CategoryBreakdown({
               <div key={cat} className="flex items-center gap-1.5">
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: CATEGORY_COLORS[cat] }}
+                  style={{ backgroundColor: colorMap.get(cat) }}
                 />
                 <span>{cat}</span>
                 <span className="text-gray-400">

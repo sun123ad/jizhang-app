@@ -36,6 +36,16 @@ create table if not exists transactions (
 create index if not exists transactions_ledger_id_occurred_on_idx
   on transactions (ledger_id, occurred_on desc);
 
+-- 用户自定义分类（比如"理财"），账本内共享
+create table if not exists custom_categories (
+  id uuid primary key default gen_random_uuid(),
+  ledger_id uuid references ledgers(id) on delete cascade,
+  type text not null check (type in ('income', 'expense')),
+  name text not null,
+  created_at timestamptz not null default now(),
+  unique (ledger_id, type, name)
+);
+
 -- 汇率缓存
 create table if not exists exchange_rates (
   base_currency text not null,
@@ -50,6 +60,7 @@ create table if not exists exchange_rates (
 alter table ledgers enable row level security;
 alter table ledger_members enable row level security;
 alter table transactions enable row level security;
+alter table custom_categories enable row level security;
 
 -- 用 security definer 函数判断成员关系：owner 绕过 RLS，避免 ledger_members
 -- 策略里自己查自己触发 "infinite recursion detected in policy" (42P17)
@@ -78,6 +89,11 @@ create policy "members can read their membership" on ledger_members
 
 drop policy if exists "members can CRUD their ledger's transactions" on transactions;
 create policy "members can CRUD their ledger's transactions" on transactions
+  for all using (is_ledger_member(ledger_id))
+  with check (is_ledger_member(ledger_id));
+
+drop policy if exists "members can CRUD their ledger's categories" on custom_categories;
+create policy "members can CRUD their ledger's categories" on custom_categories
   for all using (is_ledger_member(ledger_id))
   with check (is_ledger_member(ledger_id));
 

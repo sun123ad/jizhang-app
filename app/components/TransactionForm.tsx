@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useAuth } from "@/lib/AuthProvider";
+import { useCategories } from "@/lib/useCategories";
 import {
   CURRENCIES,
   EXPENSE_CATEGORIES,
@@ -8,6 +10,8 @@ import {
   type Currency,
   type TransactionType,
 } from "@/lib/types";
+
+const NEW_CATEGORY_OPTION = "__new__";
 
 export interface TransactionFormValues {
   occurredOn: string;
@@ -49,10 +53,20 @@ export function TransactionForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const categories = useMemo(
-    () => (values.type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES),
-    [values.type],
+  const { ledgerId } = useAuth();
+  const { categories: knownCategories, addCategory } = useCategories(
+    ledgerId,
+    values.type,
   );
+  // Guarantee the current value always has a matching <option>, even if it's
+  // an orphaned category (e.g. imported via Markdown) not in the known list.
+  const categories = knownCategories.includes(values.category)
+    ? knownCategories
+    : [values.category, ...knownCategories];
+
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   function handleTypeChange(next: TransactionType) {
     setValues((v) => ({
@@ -60,6 +74,29 @@ export function TransactionForm({
       type: next,
       category: next === "expense" ? EXPENSE_CATEGORIES[0] : INCOME_CATEGORIES[0],
     }));
+    setAddingCategory(false);
+    setCategoryError(null);
+  }
+
+  function handleCategorySelect(value: string) {
+    if (value === NEW_CATEGORY_OPTION) {
+      setAddingCategory(true);
+      setCategoryError(null);
+      return;
+    }
+    setValues((v) => ({ ...v, category: value }));
+  }
+
+  async function handleConfirmAddCategory() {
+    setCategoryError(null);
+    try {
+      const name = await addCategory(newCategoryName);
+      setValues((v) => ({ ...v, category: name }));
+      setAddingCategory(false);
+      setNewCategoryName("");
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : "添加失败，请重试");
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -147,20 +184,57 @@ export function TransactionForm({
         </label>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <div className="flex flex-col gap-1 text-sm">
         分类
-        <select
-          value={values.category}
-          onChange={(e) => setValues((v) => ({ ...v, category: e.target.value }))}
-          className="rounded-lg border border-gray-300 px-3 py-2"
-        >
-          {categories.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </label>
+        {addingCategory ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                autoFocus
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="新分类名称，比如理财"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2"
+              />
+              <button
+                type="button"
+                onClick={handleConfirmAddCategory}
+                className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white"
+              >
+                添加
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setAddingCategory(false);
+                setNewCategoryName("");
+                setCategoryError(null);
+              }}
+              className="self-start text-xs text-gray-500 underline"
+            >
+              取消，改选已有分类
+            </button>
+            {categoryError && (
+              <p className="text-xs text-red-600">{categoryError}</p>
+            )}
+          </div>
+        ) : (
+          <select
+            value={values.category}
+            onChange={(e) => handleCategorySelect(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2"
+          >
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+            <option value={NEW_CATEGORY_OPTION}>+ 新建分类...</option>
+          </select>
+        )}
+      </div>
 
       <label className="flex flex-col gap-1 text-sm">
         备注
