@@ -102,7 +102,7 @@ export function CategoryBreakdown({
       </div>
 
       {categoryList.length === 0 && (
-        <p className="text-sm text-gray-400">本月还没有支出记录</p>
+        <p className="text-sm text-gray-400">这个月还没有支出记录</p>
       )}
 
       {categoryList.length > 0 && view === "list" && (

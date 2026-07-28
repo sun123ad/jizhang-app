@@ -1,25 +1,122 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthProvider";
 import { useTransactions } from "@/lib/useTransactions";
 import { useMembers } from "@/lib/useMembers";
+import { monthRange } from "@/lib/monthRange";
 import { BASE_CURRENCY } from "@/lib/types";
+
+const ALL = "__all__";
 
 export default function TransactionsPage() {
   const { ledgerId } = useAuth();
-  const { transactions, loading } = useTransactions(ledgerId);
+  const [showAllTime, setShowAllTime] = useState(false);
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState(ALL);
+  const [memberFilter, setMemberFilter] = useState(ALL);
+
+  const { from, to, label } = useMemo(() => monthRange(monthOffset), [monthOffset]);
+  const { transactions, loading } = useTransactions(
+    ledgerId,
+    showAllTime ? undefined : { from, to },
+  );
   const members = useMembers(ledgerId);
+
+  const categories = useMemo(() => {
+    const set = new Set(transactions.map((t) => t.category));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "zh"));
+  }, [transactions]);
+
+  const filtered = transactions.filter((t) => {
+    if (categoryFilter !== ALL && t.category !== categoryFilter) return false;
+    if (memberFilter !== ALL && t.user_id !== memberFilter) return false;
+    return true;
+  });
 
   return (
     <div className="flex flex-col gap-3">
       <h1 className="text-xl font-semibold">交易明细</h1>
+
+      <div className="flex rounded-lg bg-gray-100 p-1 text-sm">
+        <button
+          type="button"
+          onClick={() => setShowAllTime(false)}
+          className={`flex-1 rounded-md py-2 ${
+            !showAllTime ? "bg-white shadow font-medium" : "text-gray-500"
+          }`}
+        >
+          按月查看
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowAllTime(true)}
+          className={`flex-1 rounded-md py-2 ${
+            showAllTime ? "bg-white shadow font-medium" : "text-gray-500"
+          }`}
+        >
+          全部
+        </button>
+      </div>
+
+      {!showAllTime && (
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-2 py-2">
+          <button
+            type="button"
+            onClick={() => setMonthOffset((o) => o - 1)}
+            className="rounded-lg px-3 py-1 text-lg text-gray-500"
+          >
+            ‹
+          </button>
+          <p className="font-medium">{label}</p>
+          <button
+            type="button"
+            onClick={() => setMonthOffset((o) => o + 1)}
+            disabled={monthOffset >= 0}
+            className="rounded-lg px-3 py-1 text-lg text-gray-500 disabled:opacity-30"
+          >
+            ›
+          </button>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        >
+          <option value={ALL}>全部分类</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <select
+          value={memberFilter}
+          onChange={(e) => setMemberFilter(e.target.value)}
+          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        >
+          <option value={ALL}>全部成员</option>
+          {Object.entries(members).map(([userId, name]) => (
+            <option key={userId} value={userId}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {loading && <p className="text-sm text-gray-400">加载中...</p>}
       {!loading && transactions.length === 0 && (
         <p className="text-sm text-gray-400">还没有记录，去记一笔吧</p>
       )}
+      {!loading && transactions.length > 0 && filtered.length === 0 && (
+        <p className="text-sm text-gray-400">没有符合筛选条件的记录</p>
+      )}
       <ul className="flex flex-col gap-2">
-        {transactions.map((t) => (
+        {filtered.map((t) => (
           <li key={t.id}>
             <Link
               href={`/transactions/${t.id}/edit`}

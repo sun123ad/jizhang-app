@@ -5,18 +5,10 @@ import Link from "next/link";
 import { useAuth } from "@/lib/AuthProvider";
 import { useTransactions } from "@/lib/useTransactions";
 import { getExchangeRate } from "@/lib/exchangeRate";
+import { monthRange } from "@/lib/monthRange";
 import { BASE_CURRENCY, CURRENCIES, type Currency } from "@/lib/types";
 import { BackupReminderBanner } from "@/app/components/BackupReminderBanner";
 import { CategoryBreakdown } from "@/app/components/CategoryBreakdown";
-
-function monthRange() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  return {
-    from: first.toISOString().slice(0, 10),
-    to: now.toISOString().slice(0, 10),
-  };
-}
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -24,7 +16,8 @@ function today() {
 
 export default function HomePage() {
   const { ledgerId, loading: authLoading } = useAuth();
-  const { from, to } = useMemo(() => monthRange(), []);
+  const [monthOffset, setMonthOffset] = useState(0);
+  const { from, to, label } = useMemo(() => monthRange(monthOffset), [monthOffset]);
   const { transactions, loading } = useTransactions(ledgerId, { from, to });
 
   const [displayCurrency, setDisplayCurrency] = useState<Currency>(BASE_CURRENCY);
@@ -89,9 +82,28 @@ export default function HomePage() {
     <div className="flex flex-col gap-4">
       <BackupReminderBanner />
 
+      <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-2 py-2">
+        <button
+          type="button"
+          onClick={() => setMonthOffset((o) => o - 1)}
+          className="rounded-lg px-3 py-1 text-lg text-gray-500"
+        >
+          ‹
+        </button>
+        <p className="font-medium">{label}</p>
+        <button
+          type="button"
+          onClick={() => setMonthOffset((o) => o + 1)}
+          disabled={monthOffset >= 0}
+          className="rounded-lg px-3 py-1 text-lg text-gray-500 disabled:opacity-30"
+        >
+          ›
+        </button>
+      </div>
+
       <section className="rounded-xl border border-gray-200 bg-white p-5">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">本月结余（{displayCurrency}）</p>
+          <p className="text-sm text-gray-500">结余（{displayCurrency}）</p>
           {loading && <span className="text-xs text-gray-400">同步中...</span>}
         </div>
         <p className="mt-1 text-3xl font-semibold">
