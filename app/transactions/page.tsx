@@ -2,19 +2,26 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthProvider";
 import { useTransactions } from "@/lib/useTransactions";
 import { useMembers } from "@/lib/useMembers";
-import { monthRange } from "@/lib/monthRange";
+import { monthRange, offsetFromYearMonth } from "@/lib/monthRange";
 import { BASE_CURRENCY } from "@/lib/types";
 
 const ALL = "__all__";
 
 export default function TransactionsPage() {
   const { ledgerId } = useAuth();
+  const searchParams = useSearchParams();
   const [showAllTime, setShowAllTime] = useState(false);
-  const [monthOffset, setMonthOffset] = useState(0);
-  const [categoryFilter, setCategoryFilter] = useState(ALL);
+  const [monthOffset, setMonthOffset] = useState(() => {
+    const month = searchParams.get("month");
+    return month ? offsetFromYearMonth(month) : 0;
+  });
+  const [categoryFilter, setCategoryFilter] = useState(
+    () => searchParams.get("category") ?? ALL,
+  );
   const [memberFilter, setMemberFilter] = useState(ALL);
 
   const { from, to, label } = useMemo(() => monthRange(monthOffset), [monthOffset]);

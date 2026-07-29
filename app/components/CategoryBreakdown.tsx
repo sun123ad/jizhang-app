@@ -27,9 +27,11 @@ const SEGMENT_GAP = 2;
 export function CategoryBreakdown({
   categoryList,
   currency,
+  onSelectCategory,
 }: {
   categoryList: [string, number][];
   currency: string;
+  onSelectCategory?: (category: string) => void;
 }) {
   const [view, setView] = useState<ViewMode>("list");
   const [hovered, setHovered] = useState<string | null>(null);
@@ -144,8 +146,9 @@ export function CategoryBreakdown({
                     strokeDashoffset={s.dashOffset}
                     onMouseEnter={() => setHovered(s.cat)}
                     onMouseLeave={() => setHovered(null)}
+                    onClick={() => onSelectCategory?.(s.cat)}
                     style={{
-                      cursor: "pointer",
+                      cursor: onSelectCategory ? "pointer" : "default",
                       opacity: hovered && hovered !== s.cat ? 0.4 : 1,
                       transition: "opacity 0.15s",
                     }}
@@ -153,7 +156,7 @@ export function CategoryBreakdown({
                     <title>
                       {`${s.cat} ${s.amt.toFixed(2)} ${currency}（${
                         total ? ((s.amt / total) * 100).toFixed(1) : "0"
-                      }%）`}
+                      }%）${onSelectCategory ? " · 点击查看明细" : ""}`}
                     </title>
                   </circle>
                 ))}
@@ -182,16 +185,24 @@ export function CategoryBreakdown({
 
           <div className="flex w-full flex-wrap gap-x-4 gap-y-2 text-sm">
             {ordered.map(([cat, amt]) => (
-              <div key={cat} className="flex items-center gap-1.5">
+              <button
+                key={cat}
+                type="button"
+                onClick={() => onSelectCategory?.(cat)}
+                disabled={!onSelectCategory}
+                className="flex items-center gap-1.5"
+              >
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: colorMap.get(cat) }}
                 />
-                <span>{cat}</span>
+                <span className={onSelectCategory ? "underline" : undefined}>
+                  {cat}
+                </span>
                 <span className="text-gray-400">
                   {amt.toFixed(2)} · {total ? ((amt / total) * 100).toFixed(0) : "0"}%
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         </div>

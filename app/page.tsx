@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthProvider";
 import { useTransactions } from "@/lib/useTransactions";
 import { getExchangeRate } from "@/lib/exchangeRate";
@@ -16,8 +17,12 @@ function today() {
 
 export default function HomePage() {
   const { ledgerId, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [monthOffset, setMonthOffset] = useState(0);
-  const { from, to, label } = useMemo(() => monthRange(monthOffset), [monthOffset]);
+  const { from, to, label, yearMonth } = useMemo(
+    () => monthRange(monthOffset),
+    [monthOffset],
+  );
   const { transactions, loading } = useTransactions(ledgerId, { from, to });
 
   const [displayCurrency, setDisplayCurrency] = useState<Currency>(BASE_CURRENCY);
@@ -151,6 +156,11 @@ export default function HomePage() {
             ([cat, amt]) => [cat, convert(amt)] as [string, number],
           )}
           currency={displayCurrency}
+          onSelectCategory={(category) =>
+            router.push(
+              `/transactions?category=${encodeURIComponent(category)}&month=${yearMonth}`,
+            )
+          }
         />
       </section>
 
